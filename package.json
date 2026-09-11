@@ -1,0 +1,23 @@
+{
+  "name": "pi-firecrawl-native",
+  "version": "0.1.0",
+  "description": "Three compact Pi tools for Firecrawl's native developer, question, and advanced search APIs.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["pi-package", "pi-extension", "firecrawl", "developer-search"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TreptowerPark/pi-firecrawl-native.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TreptowerPark/pi-firecrawl-native/issues"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  }
+}
