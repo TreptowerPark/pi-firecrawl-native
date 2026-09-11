@@ -329,6 +329,7 @@ async function requestFirecrawlJson(
       headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
+      redirect: "error",
     });
     const raw = await readBoundedResponseBody(response, controller);
     if (!response.ok) throw new Error(`Firecrawl ${label} request failed (HTTP ${response.status})`);
