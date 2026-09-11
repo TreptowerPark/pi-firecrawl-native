@@ -1,6 +1,6 @@
 # Offline correctness-pass test record
 
-Tested production revision: `03c2c80ed24bf54e1dcc09965cbf780391ea0ae6`.
+Tested production revision: `5765f61a362d1293b47b49c976c2778a88a256cb`.
 
 Commands run from this repository:
 
@@ -31,7 +31,7 @@ and `dist/types/developer.d.ts`).
 
 ## Result
 
-The final suite run had **12 passing tests and 1 failing test**.
+The final suite run had **13 passing tests and 0 failing tests**.
 
 Passed coverage includes registration/import, focused-question response
 rejection and formatting/bounds, CLI and structured developer scoping,
@@ -39,20 +39,12 @@ advanced-search arguments and bounds, public URL/DNS rejection paths, synthetic
 credential precedence, error sanitization, cancellation, timeout, and response
 size limits.
 
-### Actionable failure: structured HTTP redirect policy
+### Resolved redirect-safety defect
 
-`direct HTTP disables automatic API redirects` fails reproducibly:
-
-```text
-actual fetch init.redirect: undefined
-expected: "error"
-```
-
-`requestFirecrawlJson` does not set `redirect: "error"` on credentialed direct
-fetches. This leaves redirect handling to the runtime default. The mocked test
-does not claim to prove where credentials would travel after a real redirect,
-but the client does not explicitly reject redirects. This requires a separate
-implementation decision/fix; no production behavior was changed here.
+`direct HTTP disables automatic API redirects` now passes. The shared
+`requestFirecrawlJson` fetch init explicitly sets `redirect: "error"`, so all
+structured direct requests fail closed on redirects rather than following them.
+The test confirms that policy in the mocked fetch call.
 
 ## Untested
 
