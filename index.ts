@@ -11,6 +11,10 @@ const MAX_PASSAGE_CHARS = 650;
 const MAX_QUESTION_CHARS = 4_000;
 const MAX_ERROR_CHARS = 240;
 const REQUEST_TIMEOUT_MS = 120_000;
+const FOCUSED_FALLBACK_SCHEMA = JSON.stringify({
+  type: "object",
+  properties: { answer: { type: "string" } },
+});
 
 const DEVELOPER_TYPES = ["doc", "readme", "issue", "pull_request"] as const;
 const SEARCH_SOURCES = ["web", "news"] as const;
@@ -21,7 +25,7 @@ export const DeveloperParameters = Type.Object({
   query: Type.String({ description: "Developer query" }),
   repo: Type.Optional(Type.String({ description: "GitHub owner/name" })),
   type: Type.Optional(StringEnum(DEVELOPER_TYPES, { description: "Artifact type" })),
-  limit: Type.Optional(Type.Integer({ description: "Max results" , minimum: 1, maximum: MAX_LIMIT })),
+  limit: Type.Optional(Type.Integer({ description: "Max results", minimum: 1, maximum: MAX_LIMIT })),
 });
 
 export const QuestionParameters = Type.Object({
@@ -34,7 +38,7 @@ export const SearchParameters = Type.Object({
   source: Type.Optional(StringEnum(SEARCH_SOURCES, { description: "web or news" })),
   category: Type.Optional(StringEnum(SEARCH_CATEGORIES, { description: "Firecrawl category" })),
   recency: Type.Optional(StringEnum(RECENCY_VALUES, { description: "Time window" })),
-  limit: Type.Optional(Type.Integer({ description: "Max results" , minimum: 1, maximum: MAX_LIMIT })),
+  limit: Type.Optional(Type.Integer({ description: "Max results", minimum: 1, maximum: MAX_LIMIT })),
 });
 
 type DeveloperInput = {
@@ -230,7 +234,16 @@ async function executeQuestion(input: QuestionInput, signal?: AbortSignal) {
     throw new Error("url must use HTTP or HTTPS");
   }
   const question = requiredText(input.question, "question", 2_000);
-  const answer = clip(await runFirecrawl(["scrape", url, "--query", question, "--only-main-content"], signal), MAX_QUESTION_CHARS);
+  const raw = await runFirecrawl([
+    "scrape", url, "--query", question, "--format", "json", "--schema", FOCUSED_FALLBACK_SCHEMA,
+    "--only-main-content",
+  ], signal);
+  let answer = raw.trim();
+  if (answer.startsWith("{") || answer.startsWith("[")) {
+    const response = parseJson(answer, "focused question");
+    answer = typeof response.answer === "string" ? response.answer.trim() : "";
+  }
+  answer = clip(answer, MAX_QUESTION_CHARS);
   if (!answer) throw new Error("Firecrawl returned no focused answer");
   return textResult({ answer, source: url });
 }
@@ -252,9 +265,16 @@ async function executeSearch(input: SearchInput, signal?: AbortSignal) {
   const response = parseJson(await runFirecrawl(args, signal), "search");
   const data = isObject(response.data) ? response.data : response;
   const groups: Array<{ source: string; values: unknown[] }> = [];
-  if (Array.isArray(data.web)) groups.push({ source: "web", values: data.web });
-  if (Array.isArray(data.news)) groups.push({ source: "news", values: data.news });
-  if (Array.isArray(data.developer)) groups.push({ source: "developer", values: data.developer });
+  const groupValues = {
+    web: Array.isArray(data.web) ? data.web : [],
+    news: Array.isArray(data.news) ? data.news : [],
+    developer: Array.isArray(data.developer) ? data.developer : [],
+  };
+  const groupOrder = input.category === "developer" ? ["developer", "web", "news"] : ["web", "news", "developer"];
+  for (const source of groupOrder) {
+    const values = groupValues[source as keyof typeof groupValues];
+    if (values.length > 0) groups.push({ source, values });
+  }
   const results = groups.flatMap(({ source, values }) => values.filter(isObject).map((item) => ({
     source,
     title: clip(item.title, 220) || "(untitled)",
